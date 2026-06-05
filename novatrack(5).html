@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOVAtrack · Gestion des ventes & livraisons</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #07080f;
+  --surface: #0f1120;
+  --surface2: #161829;
+  --border: #1e2238;
+  --accent: #6c63ff;
+  --accent2: #00e5ff;
+  --accent3: #ff6b6b;
+  --success: #00e096;
+  --warn: #ffb830;
+  --text: #e8eaf6;
+  --muted: #4a5080;
+  --font-head: 'Bebas Neue', sans-serif;
+  --font-body: 'Space Grotesk', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 20% 10%,rgba(108,99,255,.08) 0%,transparent 60%),radial-gradient(ellipse 40% 30% at 80% 90%,rgba(0,229,255,.06) 0%,transparent 60%);}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;z-index:9999;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:12px 20px;border-radius:10px;font-size:.85rem;opacity:0;transform:translateY(10px);transition:all .3s;pointer-events:none;max-width:300px;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast-error{border-color:var(--accent3);color:var(--accent3);}
+.toast-success{border-color:var(--success);color:var(--success);}
+
+/* ── SCREENS ── */
+.screen{display:none;}
+.screen.active{display:block;}
+#screen-auth{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+#screen-forgot{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+
+/* ── AUTH ── */
+.auth-wrap{width:100%;max-width:440px;}
+.auth-brand{margin-bottom:32px;text-align:center;}
+.brand-logo{font-family:var(--font-head);font-size:3.5rem;letter-spacing:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;}
+.brand-tag{font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px;position:relative;overflow:hidden;}
+.auth-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));}
+.tabs{display:flex;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:24px;gap:4px;}
+.tab-btn{flex:1;padding:9px;background:transparent;border:none;color:var(--muted);font-family:var(--font-body);font-size:.82rem;font-weight:500;cursor:pointer;border-radius:7px;transition:all .2s;letter-spacing:.03em;}
+.tab-btn.active{background:var(--surface2);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px;font-weight:500;}
+.form-group input,.form-group select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 14px;font-family:var(--font-body);font-size:.875rem;outline:none;transition:border-color .2s;}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent);}
+.pass-wrap{position:relative;}
+.pass-wrap input{padding-right:44px!important;}
+.pass-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:1rem;padding:4px;line-height:1;transition:color .2s;}
+.pass-toggle:hover{color:var(--accent);}
+.forgot-link{display:block;text-align:right;font-size:.75rem;color:var(--muted);cursor:pointer;margin-top:-8px;margin-bottom:14px;}
+.forgot-link:hover{color:var(--accent);}
+.divider{display:flex;align-items:center;gap:12px;margin:16px 0;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.divider span{color:var(--muted);font-size:.72rem;letter-spacing:.05em;}
+.btn-google{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 20px;border-radius:8px;background:#fff;color:#333;font-family:var(--font-body);font-size:.85rem;font-weight:600;cursor:pointer;border:none;transition:all .2s;margin-bottom:4px;}
+.btn-google:hover{background:#f1f1f1;transform:translateY(-1px);}
+.btn-google svg{width:18px;height:18px;flex-shrink:0;}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 20px;border-radius:8px;font-family:var(--font-body);font-size:.85rem;font-weight:600;cursor:pointer;border:none;transition:all .2s;white-space:nowrap;letter-spacing:.02em;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#8b84ff);color:#fff;width:100%;}
+.btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(108,99,255,.4);}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:transparent;border:1px solid var(--accent3);color:var(--accent3);}
+.btn-danger:hover{background:var(--accent3);color:#fff;}
+.btn-success{background:linear-gradient(135deg,var(--success),#00c080);color:#111;width:100%;}
+.btn-sm{padding:5px 12px;font-size:.78rem;border-radius:6px;}
+
+/* ── HEADER ── */
+header{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(7,8,15,.9);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100;}
+.logo{font-family:var(--font-head);font-weight:400;font-size:1.6rem;letter-spacing:3px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.user-name{font-size:.82rem;font-weight:500;}
+.role-badge{padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600;}
+.badge-admin{background:rgba(108,99,255,.15);color:var(--accent);border:1px solid rgba(108,99,255,.3);}
+.badge-vendeur{background:rgba(0,229,255,.1);color:var(--accent2);border:1px solid rgba(0,229,255,.2);}
+
+/* ── NAV TABS ── */
+.nav-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface);overflow-x:auto;}
+.nav-tab{padding:14px 18px;font-size:.8rem;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.03em;}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.nav-tab:hover{color:var(--text);}
+
+/* ── PAGE ── */
+.page{display:none;padding:20px 24px 40px;}
+.page.active{display:block;}
+.page-title{font-family:var(--font-head);font-size:2rem;letter-spacing:2px;margin-bottom:4px;background:linear-gradient(135deg,var(--text),var(--muted));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.page-sub{font-size:.8rem;color:var(--muted);margin-bottom:20px;}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden;transition:transform .2s;}
+.stat-card:hover{transform:translateY(-2px);}
+.stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.stat-card.s1::after{background:var(--accent);}
+.stat-card.s2::after{background:var(--success);}
+.stat-card.s3::after{background:var(--warn);}
+.stat-card.s4::after{background:var(--accent2);}
+.stat-card.s5::after{background:var(--accent3);}
+.stat-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:6px;font-weight:600;}
+.stat-value{font-family:var(--font-head);font-size:1.6rem;letter-spacing:1px;}
+.stat-card.s1 .stat-value{color:var(--accent);}
+.stat-card.s2 .stat-value{color:var(--success);}
+.stat-card.s3 .stat-value{color:var(--warn);}
+.stat-card.s4 .stat-value{color:var(--accent2);}
+.stat-card.s5 .stat-value{color:var(--accent3);}
+
+/* ── TOOLBAR ── */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.toolbar-title{font-family:var(--font-head);font-size:1.1rem;letter-spacing:1px;flex:1;min-width:100px;}
+input[type="text"],input[type="number"],input[type="tel"],input[type="email"],input[type="password"],input[type="date"],select,textarea{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 14px;font-family:var(--font-body);font-size:.85rem;outline:none;transition:border-color .2s;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+.search-input{min-width:180px;flex:1;}
+
+/* ── TABLE ── */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:auto;}
+table{width:100%;border-collapse:collapse;min-width:780px;}
+thead{background:var(--surface2);border-bottom:1px solid var(--border);}
+th{padding:11px 13px;text-align:left;font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:600;white-space:nowrap;}
+td{padding:11px 13px;font-size:.83rem;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.015);}
+.empty-state{text-align:center;padding:50px 20px;color:var(--muted);}
+.empty-state p{font-size:.85rem;margin-top:10px;}
+
+/* ── BADGES ── */
+.tag{padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600;}
+.tag-livré{background:rgba(0,224,150,.1);color:var(--success);border:1px solid rgba(0,224,150,.2);}
+.tag-encours{background:rgba(255,184,48,.1);color:var(--warn);border:1px solid rgba(255,184,48,.2);}
+.tag-nonlivré{background:rgba(255,107,107,.1);color:var(--accent3);border:1px solid rgba(255,107,107,.2);}
+.prix-val{font-family:var(--font-head);font-size:1rem;letter-spacing:.5px;color:var(--accent2);}
+.client-name{font-weight:600;}
+.client-phone{font-size:.75rem;color:var(--muted);margin-top:1px;}
+.product-tag{background:rgba(108,99,255,.1);color:var(--accent);border:1px solid rgba(108,99,255,.2);padding:2px 8px;border-radius:6px;font-size:.72rem;}
+.actions{display:flex;gap:5px;}
+.statut-sel{background:transparent!important;border:1px solid var(--border)!important;color:var(--text)!important;font-size:.78rem!important;cursor:pointer;padding:5px 8px!important;border-radius:6px!important;}
+.frais-input{width:90px!important;padding:5px 8px!important;font-size:.8rem!important;}
+
+/* ── CARDS PRODUITS ── */
+.products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px;}
+.product-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;transition:all .2s;}
+.product-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.product-card .p-name{font-weight:600;font-size:.9rem;margin-bottom:4px;}
+.product-card .p-desc{font-size:.75rem;color:var(--muted);margin-bottom:10px;}
+.product-card .p-prix{font-family:var(--font-head);font-size:1.3rem;color:var(--accent2);letter-spacing:.5px;}
+.product-card .p-actions{display:flex;gap:6px;margin-top:12px;}
+.product-inactive{opacity:.45;}
+
+/* ── PAGE PUBLIQUE ── */
+.public-wrap{min-height:100vh;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;}
+.public-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px;width:100%;max-width:480px;position:relative;overflow:hidden;}
+.public-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--success));}
+.public-brand{font-family:var(--font-head);font-size:1rem;letter-spacing:3px;color:var(--muted);margin-bottom:4px;}
+.public-boutique{font-size:1.4rem;font-weight:700;margin-bottom:6px;}
+.public-sub{font-size:.8rem;color:var(--muted);margin-bottom:24px;}
+.qty-wrap{display:flex;align-items:center;gap:10px;}
+.qty-btn{width:34px;height:34px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.qty-btn:hover{border-color:var(--accent);color:var(--accent);}
+.qty-val{font-family:var(--font-head);font-size:1.3rem;min-width:30px;text-align:center;}
+.total-line{display:flex;justify-content:space-between;align-items:center;padding:14px;background:var(--surface2);border-radius:10px;margin:16px 0;}
+.total-label{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.total-val{font-family:var(--font-head);font-size:1.5rem;color:var(--accent2);}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:200;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.active{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:500px;max-height:92vh;overflow-y:auto;animation:slideUp .22s ease;}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.modal h2{font-family:var(--font-head);font-size:1.4rem;letter-spacing:1px;margin-bottom:20px;color:var(--accent);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-full{grid-column:1/-1;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+.modal .form-group{margin-bottom:0;}
+
+/* ── BOUTIQUE SETUP ── */
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:500px;margin:0 auto;}
+.setup-card h2{font-family:var(--font-head);font-size:1.8rem;letter-spacing:2px;margin-bottom:6px;color:var(--accent);}
+.setup-card p{font-size:.82rem;color:var(--muted);margin-bottom:24px;}
+.link-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:.82rem;color:var(--accent2);font-family:monospace;word-break:break-all;margin:10px 0;}
+
+/* ── WHATSAPP BTN ── */
+.btn-whatsapp{background:#25d366;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+.btn-whatsapp:hover{background:#1ebe5a;}
+
+@media(max-width:700px){
+  .stats-grid{grid-template-columns:1fr 1fr;}
+  header,.page,.nav-tabs{padding-left:14px;padding-right:14px;}
+  .form-grid{grid-template-columns:1fr;}
+  .page{padding:16px 14px 40px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ AUTH ══ -->
+<div id="screen-auth" class="screen active" style="display:flex;">
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <div class="brand-logo">NOVATRACK</div>
+      <div class="brand-tag">Gestion des ventes & livraisons</div>
+    </div>
+    <div class="auth-card">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('login')">Connexion</button>
+        <button class="tab-btn" onclick="showTab('register')">Créer un compte</button>
+      </div>
+
+      <div id="tab-login" class="tab-panel active">
+        <button class="btn-google" onclick="doGoogleLogin()">
+          <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.34-8.16 2.34-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continuer avec Google
+        </button>
+        <div class="divider"><span>ou</span></div>
+        <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="votre@email.com"></div>
+        <div class="form-group">
+          <label>Mot de passe</label>
+          <div class="pass-wrap">
+            <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+            <button class="pass-toggle" onclick="togglePass('login-pass',this)" tabindex="-1">👁️</button>
+          </div>
+        </div>
+        <a class="forgot-link" onclick="showForgot()">Mot de passe oublié ?</a>
+        <button class="btn btn-primary" id="btn-login" onclick="doLogin()">Se connecter</button>
+      </div>
+
+      <div id="tab-register" class="tab-panel">
+        <button class="btn-google" onclick="doGoogleLogin()">
+          <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.34-8.16 2.34-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continuer avec Google
+        </button>
+        <div class="divider"><span>ou</span></div>
+        <div class="form-group"><label>Nom complet</label><input type="text" id="reg-name" placeholder="Prénom Nom"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="reg-email" placeholder="votre@email.com"></div>
+        <div class="form-group">
+          <label>Mot de passe (min. 6 caractères)</label>
+          <div class="pass-wrap">
+            <input type="password" id="reg-pass" placeholder="••••••••">
+            <button class="pass-toggle" onclick="togglePass('reg-pass',this)" tabindex="-1">👁️</button>
+          </div>
+        </div>
+        <div class="form-group" id="admin-code-wrap" style="display:none">
+          <label>Code administrateur</label>
+          <input type="password" id="reg-admin-code" placeholder="Code secret admin">
+        </div>
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:14px;cursor:pointer;" onclick="toggleAdminCode()">🔐 J'ai un code administrateur</div>
+        <button class="btn btn-primary" id="btn-register" onclick="doRegister()">Créer mon compte</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MOT DE PASSE OUBLIÉ ══ -->
+<div id="screen-forgot" class="screen" style="display:none;align-items:center;justify-content:center;min-height:100vh;padding:20px;">
+  <div class="auth-wrap">
+    <div class="auth-brand"><div class="brand-logo">NOVATRACK</div></div>
+    <div class="auth-card">
+      <h3 style="font-family:var(--font-head);font-size:1.4rem;letter-spacing:1px;margin-bottom:6px;color:var(--accent);">MOT DE PASSE OUBLIÉ</h3>
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:20px;">Entre ton email pour recevoir un lien de réinitialisation.</p>
+      <div class="form-group"><label>Email</label><input type="email" id="forgot-email" placeholder="votre@email.com"></div>
+      <button class="btn btn-primary" id="btn-forgot" onclick="doForgot()" style="margin-bottom:10px">Envoyer le lien</button>
+      <button class="btn btn-outline" onclick="showLogin()" style="width:100%">← Retour</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="screen-app" class="screen" style="display:none;">
+  <header>
+    <div class="logo">NOVATRACK</div>
+    <div class="header-right">
+      <span class="user-name" id="user-name">—</span>
+      <span class="role-badge" id="user-role-badge">—</span>
+      <button class="btn btn-outline btn-sm" onclick="doLogout()">Déconnexion</button>
+    </div>
+  </header>
+
+  <div class="nav-tabs" id="nav-tabs">
+    <div class="nav-tab active" onclick="showPage('dashboard')">📊 Tableau de bord</div>
+    <div class="nav-tab" onclick="showPage('commandes')">📦 Commandes</div>
+    <div class="nav-tab" onclick="showPage('produits')">🛍️ Mes produits</div>
+    <div class="nav-tab" onclick="showPage('boutique')">⚙️ Ma boutique</div>
+    <div class="nav-tab admin-only" onclick="showPage('equipe')" style="display:none">👥 Équipe</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="page-dashboard" class="page active">
+    <div class="page-title">TABLEAU DE BORD</div>
+    <div class="page-sub" id="dash-sub">Bienvenue sur NOVAtrack</div>
+    <div class="stats-grid">
+      <div class="stat-card s1"><div class="stat-label">Total commandes</div><div class="stat-value" id="stat-total">0</div></div>
+      <div class="stat-card s2"><div class="stat-label">Livrées</div><div class="stat-value" id="stat-livree">0</div></div>
+      <div class="stat-card s3"><div class="stat-label">En cours</div><div class="stat-value" id="stat-encours">0</div></div>
+      <div class="stat-card s4"><div class="stat-label">Chiffre d'affaires</div><div class="stat-value" id="stat-ca">—</div></div>
+      <div class="stat-card s5"><div class="stat-label">Non livrées</div><div class="stat-value" id="stat-nonlivree">0</div></div>
+    </div>
+    <!-- Dernières commandes -->
+    <div class="toolbar">
+      <div class="toolbar-title">DERNIÈRES COMMANDES</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Client</th><th>Produit</th><th>Prix</th><th>Statut</th><th>Date</th><th></th></tr></thead>
+        <tbody id="dash-table"></tbody>
+      </table>
+      <div class="empty-state" id="dash-empty"><p>Aucune commande pour l'instant.</p></div>
+    </div>
+  </div>
+
+  <!-- COMMANDES -->
+  <div id="page-commandes" class="page">
+    <div class="page-title">COMMANDES</div>
+    <div class="toolbar">
+      <input type="text" class="search-input" id="searchInput" placeholder="🔍 Rechercher…" oninput="renderCommandes()">
+      <select id="filterStatut" onchange="renderCommandes()" style="min-width:130px">
+        <option value="">Tous statuts</option>
+        <option value="livré">✅ Livré</option>
+        <option value="en_cours">🟡 En cours</option>
+        <option value="non_livré">❌ Non livré</option>
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 CSV</button>
+      <button class="btn btn-primary btn-sm admin-only" onclick="openAddCommande()" style="width:auto">➕ Nouvelle</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Client</th><th>Adresse</th><th>Produit</th><th>Qté</th><th>Prix</th><th>Frais</th><th>Statut</th><th>Date</th><th></th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState"><p>Aucune commande.<br>Partagez votre lien de commande !</p></div>
+    </div>
+  </div>
+
+  <!-- PRODUITS -->
+  <div id="page-produits" class="page">
+    <div class="page-title">MES PRODUITS</div>
+    <div class="toolbar">
+      <div class="toolbar-title" style="flex:1"></div>
+      <button class="btn btn-primary btn-sm" onclick="openAddProduit()" style="width:auto">➕ Ajouter un produit</button>
+    </div>
+    <div class="products-grid" id="products-grid"></div>
+    <div class="empty-state" id="products-empty" style="display:none"><p>Aucun produit.<br>Ajoutez vos produits pour recevoir des commandes.</p></div>
+  </div>
+
+  <!-- BOUTIQUE -->
+  <div id="page-boutique" class="page">
+    <div class="page-title">MA BOUTIQUE</div>
+    <div class="page-sub">Configurez votre boutique et partagez votre lien</div>
+    <div class="setup-card">
+      <h2>CONFIGURATION</h2>
+      <p>Remplissez les informations de votre boutique</p>
+      <div class="form-group"><label>Nom de la boutique *</label><input type="text" id="b-nom" placeholder="Ex: Boutique Koffi"></div>
+      <div class="form-group"><label>Numéro WhatsApp *</label><input type="tel" id="b-whatsapp" placeholder="+229 97 00 00 00"></div>
+      <div class="form-group"><label>Identifiant unique (slug) *</label><input type="text" id="b-slug" placeholder="boutique-koffi" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'-')"></div>
+      <button class="btn btn-primary" id="btn-save-boutique" onclick="saveBoutique()" style="margin-top:8px">💾 Enregistrer</button>
+      <div id="boutique-link-wrap" style="display:none;margin-top:20px;">
+        <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px;">🔗 Votre lien de commande public</div>
+        <div class="link-box" id="boutique-link">—</div>
+        <button class="btn btn-outline btn-sm" onclick="copyLink()" style="margin-top:6px">📋 Copier le lien</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ÉQUIPE (admin only) -->
+  <div id="page-equipe" class="page">
+    <div class="page-title">ÉQUIPE</div>
+    <div class="page-sub">Gérez vos vendeurs</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nom</th><th>Email</th><th>Rôle</th><th>Commandes</th></tr></thead>
+        <tbody id="equipe-table"></tbody>
+      </table>
+      <div class="empty-state" id="equipe-empty"><p>Aucun membre d'équipe.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE PUBLIQUE COMMANDE -->
+<div id="screen-public" class="screen" style="display:none;">
+  <div class="public-wrap">
+    <div class="public-card">
+      <div class="public-brand">NOVATRACK</div>
+      <div class="public-boutique" id="pub-boutique-nom">Boutique</div>
+      <div class="public-sub">Remplissez le formulaire pour passer votre commande</div>
+      <div class="form-group">
+        <label>Choisir un produit *</label>
+        <select id="pub-produit" onchange="updateTotal()">
+          <option value="">Sélectionner un produit</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Quantité</label>
+        <div class="qty-wrap">
+          <button class="qty-btn" onclick="changeQty(-1)">−</button>
+          <span class="qty-val" id="pub-qty">1</span>
+          <button class="qty-btn" onclick="changeQty(1)">+</button>
+        </div>
+      </div>
+      <div class="total-line">
+        <span class="total-label">Total</span>
+        <span class="total-val" id="pub-total">0 FCFA</span>
+      </div>
+      <div class="form-group"><label>Votre nom *</label><input type="text" id="pub-nom" placeholder="Prénom Nom"></div>
+      <div class="form-group"><label>Téléphone *</label><input type="tel" id="pub-tel" placeholder="+229 97 00 00 00"></div>
+      <div class="form-group"><label>Adresse de livraison *</label><input type="text" id="pub-adresse" placeholder="Quartier, Ville"></div>
+      <div class="form-group"><label>Notes (optionnel)</label><input type="text" id="pub-notes" placeholder="Instructions spéciales…"></div>
+      <button class="btn btn-success" id="btn-commander" onclick="passerCommande()">✅ Commander maintenant</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COMMANDE -->
+<div class="modal-overlay" id="modalCommande" onclick="if(event.target===this)closeModal('modalCommande')">
+  <div class="modal">
+    <h2 id="modal-cmd-title">➕ NOUVELLE COMMANDE</h2>
+    <input type="hidden" id="editId">
+    <div class="form-grid">
+      <div class="form-group"><label>Nom client *</label><input type="text" id="f-nom" placeholder="Jean Koffi"></div>
+      <div class="form-group"><label>Téléphone *</label><input type="tel" id="f-tel" placeholder="+229 97..."></div>
+      <div class="form-group form-full"><label>Adresse *</label><input type="text" id="f-adresse" placeholder="Parakou, Banikani"></div>
+      <div class="form-group"><label>Produit</label><input type="text" id="f-produit" placeholder="Nom du produit"></div>
+      <div class="form-group"><label>Quantité</label><input type="number" id="f-qty" value="1" min="1"></div>
+      <div class="form-group"><label>Prix (FCFA)</label><input type="number" id="f-prix" placeholder="15000" min="0"></div>
+      <div class="form-group"><label>Frais livraison</label><input type="number" id="f-frais" placeholder="0" min="0"></div>
+      <div class="form-group">
+        <label>Statut</label>
+        <select id="f-statut">
+          <option value="en_cours">🟡 En cours</option>
+          <option value="livré">✅ Livré</option>
+          <option value="non_livré">❌ Non livré</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Date</label><input type="text" id="f-date" placeholder="JJ/MM/AAAA"></div>
+      <div class="form-group form-full"><label>Notes</label><input type="text" id="f-notes" placeholder="Instructions…"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modalCommande')">Annuler</button>
+      <button class="btn btn-primary" id="btn-save-cmd" onclick="saveCommande()" style="width:auto">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PRODUIT -->
+<div class="modal-overlay" id="modalProduit" onclick="if(event.target===this)closeModal('modalProduit')">
+  <div class="modal">
+    <h2 id="modal-prod-title">➕ NOUVEAU PRODUIT</h2>
+    <input type="hidden" id="prod-editId">
+    <div class="form-group"><label>Nom du produit *</label><input type="text" id="p-nom" placeholder="Ex: Prostate Forte 60 gél."></div>
+    <div class="form-group"><label>Prix (FCFA) *</label><input type="number" id="p-prix" placeholder="15000" min="0"></div>
+    <div class="form-group"><label>Description</label><textarea id="p-desc" placeholder="Description du produit…" rows="3" style="width:100%;resize:vertical;"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('modalProduit')">Annuler</button>
+      <button class="btn btn-primary" id="btn-save-prod" onclick="saveProduit()" style="width:auto">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://gmplgzztcnolnqmwrtuk.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtcGxnenp0Y25vbG5xbXdydHVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MzY1MTAsImV4cCI6MjA5NjAxMjUxMH0.ITe4t3e7B5cJ9eQ0_oKa1AUMPM1RQfwclcetYh0ezKY';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser=null, currentRole=null, currentBoutique=null;
+let orders=[], produits=[], pollInterval=null;
+let pubBoutique=null, pubProduits=[], pubQty=1;
+
+const $=id=>document.getElementById(id);
+function toast(msg,type='success'){
+  const t=document.createElement('div');
+  t.className=`toast toast-${type}`;t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10);
+  setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},3200);
+}
+function setLoad(btn,v){btn.disabled=v;btn.dataset.orig=btn.dataset.orig||btn.textContent;btn.textContent=v?'…':btn.dataset.orig;}
+function todayStr(){const d=new Date();return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmt(n){return (+n||0).toLocaleString('fr-FR');}
+
+// ── Page publique via URL hash ──
+function checkPublicPage(){
+  const hash = window.location.hash;
+  if(hash.startsWith('#/commande/')){
+    const slug = hash.replace('#/commande/','');
+    loadPublicPage(slug);
+    return true;
+  }
+  return false;
+}
+
+async function loadPublicPage(slug){
+  showScreen('screen-public');
+  const {data:b} = await sb.from('boutiques').select('*').eq('slug',slug).maybeSingle();
+  if(!b){document.querySelector('.public-card').innerHTML='<p style="color:var(--accent3);text-align:center">Boutique introuvable</p>';return;}
+  pubBoutique = b;
+  $('pub-boutique-nom').textContent = b.nom;
+  const {data:prods} = await sb.from('produits').select('*').eq('boutique_id',b.id).eq('actif',true);
+  pubProduits = prods||[];
+  const sel = $('pub-produit');
+  sel.innerHTML = '<option value="">Sélectionner un produit</option>';
+  pubProduits.forEach(p=>{
+    const o=document.createElement('option');
+    o.value=p.id; o.textContent=`${p.nom} — ${fmt(p.prix)} FCFA`;
+    o.dataset.prix=p.prix; o.dataset.nom=p.nom;
+    sel.appendChild(o);
+  });
+  updateTotal();
+}
+
+window.changeQty = d => {
+  pubQty = Math.max(1, pubQty+d);
+  $('pub-qty').textContent = pubQty;
+  updateTotal();
+};
+
+window.updateTotal = () => {
+  const sel = $('pub-produit');
+  const opt = sel.options[sel.selectedIndex];
+  const prix = opt && opt.dataset.prix ? +opt.dataset.prix : 0;
+  $('pub-total').textContent = fmt(prix*pubQty)+' FCFA';
+};
+
+window.passerCommande = async () => {
+  const sel = $('pub-produit');
+  const opt = sel.options[sel.selectedIndex];
+  const nom=$('pub-nom').value.trim(), tel=$('pub-tel').value.trim(), adresse=$('pub-adresse').value.trim();
+  if(!sel.value||!nom||!tel||!adresse) return toast('Remplissez tous les champs obligatoires','error');
+  const btn=$('btn-commander'); setLoad(btn,true);
+  try {
+    const {error} = await sb.from('commandes').insert({
+      nom, tel, adresse,
+      produit: opt.dataset.nom,
+      prix: +opt.dataset.prix * pubQty,
+      quantite: pubQty,
+      statut:'en_cours',
+      date: todayStr(),
+      notes: $('pub-notes').value.trim(),
+      boutique_id: pubBoutique.id,
+      user_id: pubBoutique.owner_id
+    });
+    if(error) throw error;
+    // WhatsApp notification
+    const msg = encodeURIComponent(`🛒 Nouvelle commande NOVAtrack !\n\nClient: ${nom}\nTél: ${tel}\nAdresse: ${adresse}\nProduit: ${opt.dataset.nom} x${pubQty}\nTotal: ${fmt(+opt.dataset.prix*pubQty)} FCFA`);
+    const wa = pubBoutique.whatsapp.replace(/[^0-9]/g,'');
+    document.querySelector('.public-card').innerHTML = `
+      <div style="text-align:center;padding:20px">
+        <div style="font-size:3rem;margin-bottom:16px">✅</div>
+        <div style="font-family:var(--font-head);font-size:1.8rem;color:var(--success);margin-bottom:8px">COMMANDE ENVOYÉE !</div>
+        <p style="color:var(--muted);font-size:.85rem;margin-bottom:20px">Votre commande a été enregistrée.<br>Le vendeur vous contactera bientôt.</p>
+        <a href="https://wa.me/${wa}?text=${msg}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:#25d366;color:#fff;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:600;font-size:.9rem">
+          💬 Confirmer sur WhatsApp
+        </a>
+      </div>`;
+  } catch(e){ toast(e.message,'error'); }
+  finally{ setLoad(btn,false); }
+};
+
+// ── Auth ──
+window.togglePass=(id,btn)=>{const i=$(id);i.type=i.type==='password'?'text':'password';btn.textContent=i.type==='password'?'👁️':'🙈';};
+window.showTab=tab=>{document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['login','register'][i]===tab));['tab-login','tab-register'].forEach(id=>$(id).classList.toggle('active',id===`tab-${tab}`));};
+window.showForgot=()=>{showScreen('screen-forgot');};
+window.showLogin=()=>{showScreen('screen-auth');};
+
+window.doForgot=async()=>{
+  const email=$('forgot-email').value.trim(), btn=$('btn-forgot');
+  if(!email) return toast('Entre ton email','error');
+  setLoad(btn,true);
+  try{const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});if(error)throw error;toast('Lien envoyé ! Vérifie ton email 📧');setTimeout(()=>showLogin(),2000);}
+  catch(e){toast(e.message,'error');}finally{setLoad(btn,false);}
+};
+
+window.doGoogleLogin=async()=>{
+  try{const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.href}});if(error)throw error;}
+  catch(e){toast('Google non encore configuré','error');}
+};
+
+window.toggleAdminCode=()=>{
+  const wrap=document.getElementById('admin-code-wrap');
+  wrap.style.display=wrap.style.display==='none'?'block':'none';
+};
+
+window.doRegister=async()=>{
+  const name=document.getElementById('reg-name').value.trim(),email=document.getElementById('reg-email').value.trim(),pass=document.getElementById('reg-pass').value;
+  const adminCode=document.getElementById('reg-admin-code').value.trim();
+  const btn=document.getElementById('btn-register');
+  if(!name||!email||!pass) return toast('Tous les champs sont requis','error');
+  if(pass.length<6) return toast('Mot de passe : 6 caractères minimum','error');
+  setLoad(btn,true);
+  try{
+    let role='vendeur';
+    if(adminCode){
+      const res=await fetch(SUPABASE_URL+'/functions/v1/clever-action',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_ANON_KEY},
+        body:JSON.stringify({code:adminCode})
+      });
+      const result=await res.json();
+      if(!result.valid){setLoad(btn,false);return toast('Code administrateur incorrect','error');}
+      role='admin';
+    }
+    const{data,error}=await sb.auth.signUp({email,password:pass,options:{data:{name,role}}});
+    if(error) throw error;
+    await sb.from('profiles').upsert({id:data.user.id,name,email,role});
+    toast('Compte créé !');
+    setTimeout(()=>{document.getElementById('login-email').value=email;document.getElementById('login-pass').value=pass;showTab('login');doLogin();},1000);
+  }catch(e){toast(e.message,'error');}finally{setLoad(btn,false);}
+};
+
+window.doLogin=async()=>{
+  const email=$('login-email').value.trim(),pass=$('login-pass').value,btn=$('btn-login');
+  if(!email||!pass) return toast('Email et mot de passe requis','error');
+  setLoad(btn,true);
+  try{
+    const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error) throw error;
+    currentUser=data.user;
+    const{data:profile}=await sb.from('profiles').select('role,name').eq('id',currentUser.id).maybeSingle();
+    currentRole=profile?.role||'vendeur';
+    currentUser.displayName=profile?.name||email;
+    await loadApp();
+  }catch(e){toast(e.message==='Invalid login credentials'?'Email ou mot de passe incorrect':e.message,'error');}
+  finally{setLoad(btn,false);}
+};
+
+window.doLogout=async()=>{
+  if(pollInterval) clearInterval(pollInterval);
+  await sb.auth.signOut();
+  currentUser=null;currentRole=null;currentBoutique=null;orders=[];produits=[];
+  showScreen('screen-auth');
+};
+
+// ── App ──
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.style.display='none');
+  const s=$(id); if(s){s.style.display=id==='screen-auth'||id==='screen-forgot'?'flex':'block';}
+}
+
+async function loadApp(){
+  showScreen('screen-app');
+  $('user-name').textContent=currentUser.displayName;
+  $('user-role-badge').className='role-badge '+(currentRole==='admin'?'badge-admin':'badge-vendeur');
+  $('user-role-badge').textContent=currentRole==='admin'?'👑 Admin':'🛍️ Vendeur';
+  document.querySelectorAll('.admin-only').forEach(el=>el.style.display=currentRole==='admin'?'':'none');
+  // Charger boutique
+  const{data:b}=await sb.from('boutiques').select('*').eq('owner_id',currentUser.id).maybeSingle();
+  currentBoutique=b||null;
+  if(currentBoutique){
+    $('b-nom').value=currentBoutique.nom||'';
+    $('b-whatsapp').value=currentBoutique.whatsapp||'';
+    $('b-slug').value=currentBoutique.slug||'';
+    updateBoutiqueLink();
+  }
+  await fetchAll();
+  if(pollInterval) clearInterval(pollInterval);
+  pollInterval=setInterval(fetchAll,15000);
+}
+
+async function fetchAll(){
+  await fetchOrders();
+  await fetchProduits();
+  renderDashboard();
+  renderCommandes();
+  renderProduits();
+}
+
+async function fetchOrders(){
+  let q=sb.from('commandes').select('*').order('created_at',{ascending:false});
+  if(currentRole!=='admin') q=q.eq('user_id',currentUser.id);
+  const{data}=await q;
+  orders=data||[];
+}
+
+async function fetchProduits(){
+  if(!currentBoutique){produits=[];return;}
+  const{data}=await sb.from('produits').select('*').eq('boutique_id',currentBoutique.id).order('created_at',{ascending:false});
+  produits=data||[];
+}
+
+// ── Dashboard ──
+function renderDashboard(){
+  const total=orders.length;
+  const livree=orders.filter(o=>o.statut==='livré').length;
+  const encours=orders.filter(o=>o.statut==='en_cours').length;
+  const nonlivree=orders.filter(o=>o.statut==='non_livré').length;
+  const ca=orders.filter(o=>o.statut==='livré').reduce((s,o)=>s+(+o.prix||0),0);
+  $('stat-total').textContent=total;
+  $('stat-livree').textContent=livree;
+  $('stat-encours').textContent=encours;
+  $('stat-ca').textContent=fmt(ca)+' F';
+  $('stat-nonlivree').textContent=nonlivree;
+  $('dash-sub').textContent=`Bonjour ${currentUser.displayName} 👋`;
+  const recent=orders.slice(0,5);
+  $('dash-empty').style.display=recent.length?'none':'block';
+  $('dash-table').innerHTML=recent.map((o,i)=>`
+    <tr>
+      <td style="color:var(--muted);font-size:.75rem">${i+1}</td>
+      <td><div class="client-name">${esc(o.nom)}</div><div class="client-phone">${esc(o.tel||'')}</div></td>
+      <td><span class="product-tag">${esc(o.produit||'—')}</span></td>
+      <td><span class="prix-val">${fmt(o.prix)} F</span></td>
+      <td>${statutBadge(o.statut)}</td>
+      <td style="color:var(--muted);font-size:.78rem">${esc(o.date||'')}</td>
+      <td>${o.tel?`<button class="btn-whatsapp" onclick="callWhatsapp('${o.tel}','${esc(o.nom)}')">💬</button>`:''}
+      </td>
+    </tr>`).join('');
+}
+
+function statutBadge(s){
+  if(s==='livré') return '<span class="tag tag-livré">✅ Livré</span>';
+  if(s==='en_cours') return '<span class="tag tag-encours">🟡 En cours</span>';
+  return '<span class="tag tag-nonlivré">❌ Non livré</span>';
+}
+
+// ── Commandes ──
+function renderCommandes(){
+  const q=($('searchInput')?.value||'').toLowerCase();
+  const fs=$('filterStatut')?.value||'';
+  const filtered=orders.filter(o=>{
+    const match=!q||[o.nom,o.adresse,o.produit,o.tel].some(v=>(v||'').toLowerCase().includes(q));
+    return match&&(!fs||o.statut===fs);
+  });
+  $('emptyState').style.display=filtered.length?'none':'block';
+  $('tableBody').innerHTML=filtered.map((o,i)=>`
+    <tr>
+      <td style="color:var(--muted);font-size:.75rem">${i+1}</td>
+      <td><div class="client-name">${esc(o.nom)}</div><div class="client-phone">${esc(o.tel||'')}</div></td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.adresse||'')}</td>
+      <td><span class="product-tag">${esc(o.produit||'—')}</span></td>
+      <td style="text-align:center">${o.quantite||1}</td>
+      <td><span class="prix-val">${fmt(o.prix)} F</span></td>
+      <td><input class="frais-input" type="number" value="${o.frais_livraison||0}" min="0" onchange="updateFrais('${o.id}',this.value)"></td>
+      <td><select class="statut-sel" onchange="updateStatut('${o.id}',this.value)">
+        <option value="en_cours" ${o.statut==='en_cours'?'selected':''}>🟡 En cours</option>
+        <option value="livré" ${o.statut==='livré'?'selected':''}>✅ Livré</option>
+        <option value="non_livré" ${o.statut==='non_livré'?'selected':''}>❌ Non livré</option>
+      </select></td>
+      <td style="color:var(--muted);font-size:.78rem">${esc(o.date||'')}</td>
+      <td><div class="actions">
+        ${o.tel?`<button class="btn-whatsapp" onclick="callWhatsapp('${o.tel}','${esc(o.nom)}')">💬</button>`:''}
+        <button class="btn btn-outline btn-sm" onclick="openEditCommande('${o.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCommande('${o.id}')">🗑</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+window.callWhatsapp=(tel,nom)=>{
+  const t=tel.replace(/[^0-9]/g,'');
+  window.open(`https://wa.me/${t}?text=${encodeURIComponent(`Bonjour ${nom}, concernant votre commande NOVAtrack...`)}`, '_blank');
+};
+
+// ── Produits ──
+function renderProduits(){
+  $('products-empty').style.display=produits.length?'none':'block';
+  $('products-grid').innerHTML=produits.map(p=>`
+    <div class="product-card ${p.actif?'':'product-inactive'}">
+      <div class="p-name">${esc(p.nom)}</div>
+      <div class="p-desc">${esc(p.description||'')}</div>
+      <div class="p-prix">${fmt(p.prix)} FCFA</div>
+      <div class="p-actions">
+        <button class="btn btn-outline btn-sm" onclick="openEditProduit('${p.id}')">✏️</button>
+        <button class="btn btn-outline btn-sm" onclick="toggleProduit('${p.id}',${p.actif})">${p.actif?'🙈 Masquer':'👁️ Afficher'}</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProduit('${p.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── Navigation ──
+window.showPage=name=>{
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  event.target.classList.add('active');
+  $('page-'+name).classList.add('active');
+};
+
+// ── Boutique ──
+window.saveBoutique=async()=>{
+  const nom=$('b-nom').value.trim(),whatsapp=$('b-whatsapp').value.trim(),slug=$('b-slug').value.trim();
+  if(!nom||!whatsapp||!slug) return toast('Tous les champs sont requis','error');
+  const btn=$('btn-save-boutique'); setLoad(btn,true);
+  try{
+    const payload={owner_id:currentUser.id,nom,whatsapp,slug};
+    const{data,error}=currentBoutique
+      ? await sb.from('boutiques').update(payload).eq('id',currentBoutique.id).select().single()
+      : await sb.from('boutiques').insert(payload).select().single();
+    if(error) throw error;
+    currentBoutique=data;
+    toast('Boutique sauvegardée ! ✅');
+    updateBoutiqueLink();
+    await fetchProduits();
+  }catch(e){toast(e.message.includes('unique')?'Ce slug est déjà pris, choisis-en un autre':e.message,'error');}
+  finally{setLoad(btn,false);}
+};
+
+function updateBoutiqueLink(){
+  if(!currentBoutique?.slug) return;
+  const link=`${window.location.origin}${window.location.pathname}#/commande/${currentBoutique.slug}`;
+  $('boutique-link').textContent=link;
+  $('boutique-link-wrap').style.display='block';
+}
+
+window.copyLink=()=>{
+  navigator.clipboard.writeText($('boutique-link').textContent);
+  toast('Lien copié ! 📋');
+};
+
+// ── CRUD Commandes ──
+window.openAddCommande=()=>{
+  $('modal-cmd-title').textContent='➕ NOUVELLE COMMANDE';
+  $('editId').value='';
+  ['nom','tel','adresse','produit','notes'].forEach(f=>$('f-'+f).value='');
+  $('f-qty').value=1; $('f-prix').value=''; $('f-frais').value=0;
+  $('f-statut').value='en_cours'; $('f-date').value=todayStr();
+  $('modalCommande').classList.add('active');
+};
+
+window.openEditCommande=id=>{
+  const o=orders.find(x=>x.id===id); if(!o) return;
+  $('modal-cmd-title').textContent='✏️ MODIFIER COMMANDE';
+  $('editId').value=id;
+  $('f-nom').value=o.nom||''; $('f-tel').value=o.tel||'';
+  $('f-adresse').value=o.adresse||''; $('f-produit').value=o.produit||'';
+  $('f-qty').value=o.quantite||1; $('f-prix').value=o.prix||'';
+  $('f-frais').value=o.frais_livraison||0; $('f-statut').value=o.statut||'en_cours';
+  $('f-date').value=o.date||''; $('f-notes').value=o.notes||'';
+  $('modalCommande').classList.add('active');
+};
+
+window.saveCommande=async()=>{
+  const nom=$('f-nom').value.trim(),tel=$('f-tel').value.trim(),adresse=$('f-adresse').value.trim();
+  if(!nom||!tel||!adresse) return toast('Nom, téléphone et adresse requis','error');
+  const btn=$('btn-save-cmd'); setLoad(btn,true);
+  const payload={nom,tel,adresse,produit:$('f-produit').value.trim(),quantite:+$('f-qty').value||1,prix:+$('f-prix').value||0,frais_livraison:+$('f-frais').value||0,statut:$('f-statut').value,date:$('f-date').value||todayStr(),notes:$('f-notes').value.trim(),user_id:currentUser.id};
+  if(currentBoutique) payload.boutique_id=currentBoutique.id;
+  try{
+    const id=$('editId').value;
+    const{error}=id?await sb.from('commandes').update(payload).eq('id',id):await sb.from('commandes').insert(payload);
+    if(error) throw error;
+    toast(id?'Commande mise à jour !':'Commande ajoutée !');
+    closeModal('modalCommande'); await fetchAll();
+  }catch(e){toast(e.message,'error');}finally{setLoad(btn,false);}
+};
+
+window.deleteCommande=async id=>{
+  if(!confirm('Supprimer cette commande ?')) return;
+  const{error}=await sb.from('commandes').delete().eq('id',id);
+  if(error) return toast(error.message,'error');
+  toast('Commande supprimée'); await fetchAll();
+};
+
+window.updateStatut=async(id,val)=>{
+  await sb.from('commandes').update({statut:val}).eq('id',id);
+  const o=orders.find(x=>x.id===id); if(o) o.statut=val;
+  renderDashboard(); toast('Statut mis à jour');
+};
+
+window.updateFrais=async(id,val)=>{
+  await sb.from('commandes').update({frais_livraison:+val||0}).eq('id',id);
+  const o=orders.find(x=>x.id===id); if(o) o.frais_livraison=+val||0;
+};
+
+// ── CRUD Produits ──
+window.openAddProduit=()=>{
+  $('modal-prod-title').textContent='➕ NOUVEAU PRODUIT';
+  $('prod-editId').value=''; $('p-nom').value=''; $('p-prix').value=''; $('p-desc').value='';
+  $('modalProduit').classList.add('active');
+};
+
+window.openEditProduit=id=>{
+  const p=produits.find(x=>x.id===id); if(!p) return;
+  $('modal-prod-title').textContent='✏️ MODIFIER PRODUIT';
+  $('prod-editId').value=id; $('p-nom').value=p.nom||''; $('p-prix').value=p.prix||''; $('p-desc').value=p.description||'';
+  $('modalProduit').classList.add('active');
+};
+
+window.saveProduit=async()=>{
+  if(!currentBoutique) return toast('Configurez d\'abord votre boutique','error');
+  const nom=$('p-nom').value.trim(),prix=+$('p-prix').value||0;
+  if(!nom||!prix) return toast('Nom et prix requis','error');
+  const btn=$('btn-save-prod'); setLoad(btn,true);
+  const payload={boutique_id:currentBoutique.id,nom,prix,description:$('p-desc').value.trim(),actif:true};
+  try{
+    const id=$('prod-editId').value;
+    const{error}=id?await sb.from('produits').update(payload).eq('id',id):await sb.from('produits').insert(payload);
+    if(error) throw error;
+    toast(id?'Produit mis à jour !':'Produit ajouté !');
+    closeModal('modalProduit'); await fetchProduits(); renderProduits();
+  }catch(e){toast(e.message,'error');}finally{setLoad(btn,false);}
+};
+
+window.toggleProduit=async(id,actif)=>{
+  await sb.from('produits').update({actif:!actif}).eq('id',id);
+  await fetchProduits(); renderProduits();
+  toast(actif?'Produit masqué':'Produit visible');
+};
+
+window.deleteProduit=async id=>{
+  if(!confirm('Supprimer ce produit ?')) return;
+  await sb.from('produits').delete().eq('id',id);
+  await fetchProduits(); renderProduits();
+  toast('Produit supprimé');
+};
+
+window.closeModal=id=>$(id).classList.remove('active');
+
+// ── Export CSV ──
+window.exportCSV=()=>{
+  const cols=['nom','tel','adresse','produit','quantite','prix','frais_livraison','statut','date','notes'];
+  const header=cols.join(';');
+  const rows=orders.map(o=>cols.map(c=>`"${String(o[c]||'').replace(/"/g,'""')}"`).join(';'));
+  const blob=new Blob(['\uFEFF'+header+'\n'+rows.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`novatrack_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  toast('CSV téléchargé ! 📥');
+};
+
+// ── Session ──
+sb.auth.onAuthStateChange(async(event,session)=>{
+  if(checkPublicPage()) return;
+  if(session?.user&&!currentUser){
+    currentUser=session.user;
+    const{data:profile}=await sb.from('profiles').select('role,name').eq('id',currentUser.id).maybeSingle();
+    currentRole=profile?.role||'vendeur';
+    currentUser.displayName=profile?.name||session.user.email;
+    await loadApp();
+  }
+});
+
+// Check public page on load
+if(!checkPublicPage()){
+  // normal auth flow
+}
+</script>
+</body>
+</html>

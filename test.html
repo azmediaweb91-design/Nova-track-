@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Test Supabase</title></head>
+<body style="font-family:sans-serif;padding:20px;background:#111;color:#fff;">
+<h2>Test connexion Supabase</h2>
+<input id="email" type="email" placeholder="Email" style="display:block;margin:10px 0;padding:8px;width:300px;"><br>
+<input id="pass" type="password" placeholder="Mot de passe" style="display:block;margin:10px 0;padding:8px;width:300px;"><br>
+<button onclick="testLogin()" style="padding:10px 20px;background:#6c63ff;color:#fff;border:none;cursor:pointer;">Tester</button>
+<pre id="result" style="margin-top:20px;background:#222;padding:15px;border-radius:8px;white-space:pre-wrap;"></pre>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://yertgvgiurfbpjhuhwbo.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllcnRndmdpdXJmYnBqaHVod2JvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NjI5ODYsImV4cCI6MjA5NjQzODk4Nn0.Nus3tdGURmUaq-yEe1-6Sc3aMUyS_DE0dpyYwZs39sQ'
+);
+
+async function testLogin(){
+  const email = document.getElementById('email').value;
+  const pass = document.getElementById('pass').value;
+  const result = document.getElementById('result');
+  result.textContent = 'Connexion en cours...';
+  try {
+    const {data, error} = await sb.auth.signInWithPassword({email, password: pass});
+    if(error) { result.textContent = 'ERREUR AUTH: ' + JSON.stringify(error); return; }
+    result.textContent = 'AUTH OK: ' + data.user.email + '\n\nChargement profil...';
+    const {data:profile, error:pe} = await sb.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+    if(pe) { result.textContent += '\nERREUR PROFIL: ' + JSON.stringify(pe); return; }
+    result.textContent += '\nPROFIL: ' + JSON.stringify(profile);
+    const {data:boutique, error:be} = await sb.from('boutiques').select('*').eq('owner_id', data.user.id).maybeSingle();
+    if(be) { result.textContent += '\nERREUR BOUTIQUE: ' + JSON.stringify(be); return; }
+    result.textContent += '\nBOUTIQUE: ' + JSON.stringify(boutique);
+    result.textContent += '\n\n✅ TOUT FONCTIONNE !';
+  } catch(e) {
+    result.textContent = 'EXCEPTION: ' + e.message;
+  }
+}
+</script>
+</body>
+</html>
